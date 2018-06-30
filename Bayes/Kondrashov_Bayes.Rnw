@@ -1,0 +1,2446 @@
+\documentclass[12pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english, russian]{babel}
+\usepackage{amssymb,amsmath}
+\usepackage{gensymb}
+\usepackage{svg}
+\usepackage{multicol}
+\usepackage{color}
+\usepackage{tablefootnote}
+\usepackage{graphicx}
+\usepackage{floatrow}
+\usepackage{tikz}
+\usetikzlibrary{automata, positioning}
+\usetikzlibrary{shapes.arrows, fadings}
+\usetikzlibrary{3d}
+\usepackage{blindtext}
+\usepackage[colorlinks, urlcolor = blue]{hyperref}
+\textheight = 24cm
+\textwidth = 16cm
+\oddsidemargin=0pt
+\topmargin = -1.5cm
+\parindent = 24pt
+\parskip = 0pt
+\tolerance = 2000 
+\flushbottom
+
+\setlength{\textfloatsep}{5pt plus 1.0pt minus 1.0pt}
+\setlength{\floatsep}{5pt plus 1.0pt minus 1.0pt}
+
+% Table float box with bottom caption, box width adjusted to content
+\newfloatcommand{capbtabbox}{table}[][\FBwidth]
+
+\begin{document}
+
+\begin{titlepage} 
+		
+		\thispagestyle{empty} 
+		
+		\begin{center} 
+			
+			\normalsize Национальный исследовательский университет <<Высшая школа экономики>>\\
+			\vspace{6em}
+			\Large КУРСОВАЯ РАБОТА\\
+				  Байесовский подход в задачах определения индивидуальных предпочтений
+				  
+		\end{center}
+		
+		\vspace{12em}
+		
+			\hfill
+			\vbox
+				{
+					\hbox{Выполнил: А.~А.~Кондрашов}
+					\hbox{Факультет: МИЭФ}
+					\hbox{Курс:~3}
+					\hbox{Научный руководитель: Б.~Б.~Демешев}
+				}		
+				
+		\vfill
+		
+		\begin{center}
+		Москва\\2016
+		\end{center}
+
+			
+	\end{titlepage} 
+
+\tableofcontents
+
+\newpage
+\section{Введение}
+Байесовский подход --- относительно новое слово в сфере статистики, эконометрики, а также искусственного интеллекта.
+Несмотря на то, что Томас Байес написал свое эссе\footnote{Thomas Bayes, <<An Essay towards solving a Problem in the Doctrine of Chances>>, Philosophical Transactions of the Royal Society of London 53 (1763), 370–418} ещё в 1763 году, развиваться этот метод начал только в конце прошлого века. 
+Это связано с тем, что используемые в подходе алгоритмы требуют серьёзных объёмов вычислений и возможны лишь с помощью ЭВМ.
+С развитием технологий машинного обучения этот метод набирает популярность.
+
+\vspace{6pt}
+\noindent
+К сожалению, на данный момент Байесовский подход мало распространён в России, не в последнюю очередь из-за сложности математической части и небольшого количества информации на русском языке.
+Особенно это касается эконометрических и статистических исследований с помощью Байесовских моделирования.
+С помощью этой работы я хочу внести свой вклад в популяризацию Байесовского подхода, а также языка Stan, который, на мой взгляд, является очень удачным языком моделирования, как в плане эффективности, так и в плане естественности.
+Как и о Байесовском подходе, о языке Stan имеется крайне малое количество литературы на русском языке, за исключением работ отдельно взятых учёных и исследователей. 
+
+\vspace{6pt}
+\noindent
+Данное руководство рассчитано как на опытных пользователей, так и для новичков в Байесовских методах. 
+Работа состоит из 5 основных частей: в начале будет предложена инструкция к установке Stan и необходимых пакетов в R. 
+Затем следует краткое введение в теорию Байесовского подхода.
+Далее речь пойдёт о моделях в Stan, с примерами и некоторыми нюансами.
+После этого идёт небольшая практическая часть: на базе набора данных о выборе индивидов параметров тарифов сотовой связи мы построим модель.
+После заключения также есть небольшая секция FAQ, в которой я поместил разъяснения для некоторых нюансов.
+
+
+\newpage
+\section{Подготовительный этап}
+\noindent
+В данной секции я укажу об необходимых ({\it{и, возможно, дополнительных}}) элементах для работы со Stan в R.
+
+\subsection{R}
+\noindent
+В первую очередь, нам понадобится сама среда R (или её обновление). 
+Конечно, я считаю, что читатели данной работы компетентны выполнить этот шаг самостоятельно, но во имя формальности я все-таки кратко опишу процедуру установки R:
+
+\vspace{6pt}
+\noindent
+Последнюю версию можно получить, пройдя по ссылке: \url{https://cran.r-project.org}. 
+Крайне полезным дополнением будет Rstudio, \url{https://www.rstudio.com}, в котором можно редактировать код R и Stan. 
+Кроме того, эта программа очень удобна и интуитивно понятна в вопросах интерфейса.
+
+\subsection{Установка RStan}
+\noindent
+Работа Stan подразумевает одновременное взаимодействие нескольких программ (R, компилятора C++ и, собственно, Stan), поэтому установка хоть и не сложная, но выполнять её лучше по подробной инструкции: \url{https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started}. 
+Суть её сводится к тому, что Вам необходимо установить R {$\rightarrow$} Toolchain (компилятор С++) {$\rightarrow$} настроить конфигурацию в R {$\rightarrow$} и, наконец, установить сам RStan. 
+{\bf{Я пропущу установку пререквизитов}} и перейду сразу к установке RStan:
+
+<<install RStan, message = FALSE, warning = FALSE, eval = FALSE>>=
+#Install RStan
+install.packages("rstan", repos = "https://cloud.r-project.org/", 
+                 dependencies = TRUE)
+@
+
+\noindent
+Очень важно, чтобы вместе с {\texttt{rstan}} были установлены и все зависимые пакеты. 
+После установки следует {\bf{перезагрузить R}}. Осталось проверить работоспособность toolchain:
+
+<<install RStan2, message = FALSE, warning = FALSE>>=
+fx <- inline::cxxfunction(signature(x = "integer", y = "numeric" ) , 
+      'return ScalarReal(INTEGER(x)[0] * REAL(y)[0] ) ;' )
+fx( 2L, 5 )
+@
+
+\noindent
+Должно получиться 10. В противном случае, повторите установку.
+
+\newpage
+\subsection{Необходимые пакеты}
+
+<<packages, message = FALSE, warning = FALSE>>=
+# Собственно, запуск самого Stan
+library(rstan)
+# Пакет для визуального анализа полученной модели на Stan
+library(shinystan)
+#Данные команды предназначены для ускорения Stan 
+#путём задействия большего числа ядер процессора
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+# Пакет для сравнения моделей
+library(loo)
+# Готовые модели Stan
+library(rstanarm)
+# Вывод графиков с кириллицей в pdf
+library(Cairo)
+# Всякие полезные функции для данных 
+library(psych)
+library(tidyverse)
+library(memisc)
+# Для графиков
+library(bayesplot)
+# Данные по Титанику
+library(titanic)
+# Для предельных эффектов
+library(erer)
+# Для загрузки временных рядов
+library(quantmod)
+# Пакет для временных рядов
+library(zoo)
+library(forecast)
+library(haven)
+library(reshape2)
+library(prophet)
+@
+
+\newpage
+\section{Введение в Байесовский подход}
+
+\noindent
+Иногда встречаются статистические задачи, в которых информация о состоянии мира может быть изменена после получения набора данных. 
+То есть перед решением задачи мы можем сформировать свое мнение о приемлемых моделях и дать им вероятности в зависимости от нашего доверия той или иной модели. 
+В качестве одного из способов, корректирующего приемлемость этих моделей, можно использовать байесовский подход, в основе которого лежит небезызвестная теорема Байеса.
+
+\vspace{6pt}
+\noindent
+В отличие от классических методов, применяемых в эконометрике (основывающимися на работах Фишера, Ньюмена, Пирсона и многих других), байесовские методы стали развиваться преимущественно в последнее время. 
+Это связано в первую очередь с тем, что расчеты, основанные на байесовском подходе, требуют значительных вычислительных затрат, и стали возможны лишь с развитием вычислительной техники. 
+Кроме того, байесовский подход имеет ряд привлекательных преимуществ.
+
+\vspace{6pt}
+\noindent
+Использование байесовского подхода начинается с расстановки степеней доверия (в виде вероятностей) для разных моделей.
+Делается это достаточно вольно, но с умом. 
+После получения данных, мы меняем вероятности для первоначальных моделей. 
+
+\vspace{6pt}
+\noindent
+В реальных задачах статистические данные могут отсутствовать, и использование методов, основанных на частотном подходе, может быть ошибочным. 
+Также информация может содержать субъективные оценки (например, экспертные суждения), а может и вовсе быть абсолютно новой.
+В таких задачах изучаемый нами подход может принести большую пользу. 
+
+\vspace{6pt}
+\noindent
+Как уже говорилось выше, в основе байесовского подхода лежит теорема Байеса. 
+Формула Байеса выглядит следующим образом:
+
+  \begin{center}
+    $Pr(\theta | y) = \cfrac{Pr(y|\theta)Pr(\theta)}{Pr(y)}$
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+А в более общем виде (с несколькими ($\theta_1 \dots \theta_k$)):
+
+  \begin{center}
+    $Pr(\theta_i | y) = \cfrac{Pr(y|\theta_i)Pr(\theta_i)}{Pr(y)} = \cfrac{Pr(y|\theta_i)Pr(\theta_i)}{\sum_{j = 1}^k Pr(\theta_j)Pr(y|\theta_j)}$
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+$Pr(\theta_i)$ интерпретируется как априорное распределение параметра $\theta_i$, а $Pr(\theta_i|y)$ - как апостериорное распределение параметра $\theta_i$, ведь теперь нам известны значения $y$. 
+Сами $\theta$ называются гипотезами, а $y$ - свидетельствами.
+
+\vspace{6pt}
+{\bf{Пример 1}}
+
+\vspace{6pt}
+\noindent
+Разберем небольшой пример: допустим, что благодаря развитию байесовского подхода, машинного обучения и прочих компьютерных штук, был изобретен искусственный интеллект. 
+Правда, интеллект может быть заточен некую определенную профессию, и, чтобы удовлетворить недостаток специалистов в стране была выпущена партия андроидов-специалистов. 
+Согласно статистике известно, что среди них 25\% врачей (med, $\theta_1$), 15\% инженеров (eng, $\theta_2$), 50\% строителей (bild, $\theta_3$) и 10\% - техподдержка андроидов (tech, $\theta_4$) (допустим, что андроидам-инженерам и врачам не стоит чинить друг друга). 
+Нам нужно узнать, какая профессия была у андроида, случайно отформатировавшего свою память (вместе с серийным номером).
+
+\vspace{6pt}
+\noindent
+Из задачи мы имеем следующее:
+
+  \begin{center}
+      \begin{tabular}[BH]{|p{5em}|p{3em}|p{3em}|p{3em}|p{3em}|}
+          \hline
+              i & 1 (med) & 2 (eng) & 3 (bild) & 4 (tech) \\
+          \hline
+              $Pr(\theta_i)$ & 0.25 & 0.15 & 0.5 & 0.1 \\
+          \hline
+      \end{tabular}
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+Теперь перейдем к свидетельствам, или признаками того, что у андроида та или иная работа. 
+Первым признаком андроида специалиста являются зеленая подсветка глаз - это означает, что ИИ исправен и работает корректно.
+Однако, в связи с условиями работы подсветка может испортиться, а ее замена - дело весьма трудоемкое, и техподдержка не всегда с этим справляется. 
+Допустим следующее:
+
+ \begin{center}
+      \begin{tabular}[BH]{|p{5em}|p{3em}|p{3em}|p{3em}|p{3em}|}
+          \hline
+              i & 1 (med) & 2 (eng) & 3 (bild) & 4 (tech) \\
+          \hline
+              $Pr(\theta_i)$ & 0.25 & 0.15 & 0.5 & 0.1 \\
+          \hline
+              $Pr(y_1|\theta_i)$ & 0.2 & 0.4 & 0.7 & 0.05 \\
+          \hline
+      \end{tabular}
+  \end{center}
+
+\vspace{6pt}
+\noindent
+Теперь мы можем найти $Pr(\theta_i|y_1)$ или апостериорное распределение для гипотез, используя вышеупомянутую формулу.
+
+   \begin{center}
+    $Pr(\theta_1 | y_1) = \cfrac{Pr(y_1|\theta_1)Pr(\theta_1)}{\sum_{j = 1}^k Pr(\theta_j)Pr         (y_1|\theta_j)} = $ 
+    \vspace{6pt} 
+    $ \cfrac{0.2 \times 0.25}{0.25 \times 0.2 + 0.15 \times 0.4 + 0.5 \times 0.7+ 0.1 \times 0.05}     = 0.107$
+  \end{center}
+
+\vspace{6pt}
+\noindent
+Аналогичным способом:
+
+  \begin{center}
+    $Pr(\theta_2|y_1) = 0.129$ \\
+    $Pr(\theta_3|y_1) = 0.752$ \\
+    $Pr(\theta_4|y_1) = 0.01$ \\
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+Стало быть:
+
+ \begin{center}
+      \begin{tabular}[BH]{|p{5em}|p{3em}|p{3em}|p{3em}|p{3em}|}
+          \hline
+              i & 1 (med) & 2 (eng) & 3 (bild) & 4 (tech) \\
+          \hline
+              $Pr(\theta_i)$ & 0.25 & 0.15 & 0.5 & 0.1 \\
+          \hline
+              $Pr(y_1|\theta_i)$ & 0.2 & 0.4 & 0.7 & 0.05 \\
+          \hline
+              $Pr(\theta_i|y_1)$ & 0.107 & 0.129 & 0.752 & 0.01 \\
+          \hline
+      \end{tabular}
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+После получения данных $y_1$ доверие к гипотезам изменилось.
+
+\newpage
+\section{Stan}
+\subsection{Немного о вероятностном программировании}
+\noindent
+В первую очередь хочу упомянуть, что при обсуждении вероятностного программирования стоит абстрагироваться от ассоциаций, которые навязывает слово <<программирование>>.
+Вероятностное программирование --- это, в первую очередь, инструмент для статистического (вероятностного) моделирования, а не для разработки полноценного программного обеспечения.
+Вероятностная программа работает в двух направлениях: во-первых, она может рассчитать последствия, исходя из предварительных представлений о состоянии мира (иными словами, симулировать выходные данные из имеющихся), а во-вторых, наоборот, может привести возможные объяснения, почему у нас на руках имеются такие данные\footnote{Cameron Davidson-Pilon, <<Bayesian Methods for Hackers: Probabilistic Programming and Bayesian Inference>>, Addison-Wesley Professional, 2016, p. 69}.
+Также можно выделить и третье направление:\footnote{Avi Pfeffer, Stuart Russel, <<Practical Probabilistic Programming>>, Manning Publications, 2016, p. 9.} мы можем использовать исторические данные, чтобы предсказать будущие значения.
+Всё это говорит о том, что вероятностный подход достаточно гибкий.
+
+\vspace{6pt}
+\noindent
+Вероятностное программирование реализуется с помощью соответствующих языков (PPL --- probabilistic programming language).
+Это высокоуровневые языки, предназначенные для облегчения определения моделей и автоматических расчётов по ним.
+Методы, используемые в процессе вычисления (такой как МСМС, о нём ниже), довольно сложные и требуют глубоких знаний в сфере Байесовского вывода. 
+Поэтому важно, чтобы язык был не только гибким в плане возможностей для описания моделей, но и был достаточно простым и интуитивно понятным, чтобы его могло применять большое число пользователей.
+Языков, специализирующихся в этой сфере, достаточно много, некоторые из них ещё находятся в разработке.
+Одним из зарекомендовавших себя языков является Stan.
+
+\vspace{6pt}
+\noindent
+Stan --- это вероятностный язык моделирования, то есть язык, предназначенный для описания вероятностных моделей.
+Он появился благодаря трудам сотрудников Колумбийского Университета в 2012 году (initial release) и назван в честь Станислава Улама --- математика, предложившего вычислительный метод Монте-Карло.
+Целью авторов было создать язык для Байесовского вывода для многоуровневых генерализованных линейных моделей, поскольку существующие на тот момент решения (такие как BUGS\footnote{Bayesian inference Using Gibbs Sampling} и JAGS\footnote{Just Another Gibbs Sampler}) не могли в полной мере справиться с этими моделями.
+В результате было принято решение отказаться от семплинга Гиббса в пользу более эффективного, а именно гибридного Монте-Карло (HMC).
+Дополнив алгоритм своими функциями и модификациями, авторы получили свой алгоритм семплинга (NUTS --- No-U-Turn Sampler).
+Разработка языка продолжается.
+
+\vspace{6pt}
+\noindent
+С точки зрения обычного исследователя, из всех остальных имплементаций вероятностного программирования Stan положительно выделяется своим по-человечески понятным синтаксисом. 
+В этой работе я предлагаю убедиться в этом.
+
+\newpage
+\subsection{Как работает Stan?}
+\noindent
+Stan имеет несколько интерфейсов, основными же являются три: cmdStan (командная строка), PyStan (Python) и RStan (R).
+Код на языке Stan является не алгоритмом, а описанием модели в виде блоков.
+После получения данных (наблюдений) и кода модели Stan переводит их в программу C++, которая, в свою очередь, компилируется под платформу, на которой запускается.
+Сначала проверяется код модели, а также корректность введённых данных ($y$ и $x$).
+Затем генерируется последовательность зависимых, идентично распределённых выборок $\theta^{(1)}, \theta^{(2)},$ \dots, предельное распределение каждого: $p(\theta | y, x)$.
+Процесс генерации также называется семплингом (или семплированием).
+Для его осуществления Stan использует метод Монте-Карло по схеме Марковской цепи (MCMC)\footnote{Подробнее об этом методе можно узнать в секции FAQ}, а конкретнее гибридный Монте-Карло (или Hamiltonian Monte-Carlo, HMC).
+Вкратце, МСМС --- это метод оценки параметра путём симуляции ожидаемых значений.
+Последовательные случайные выборы формируют Марковскую цепь, стационарное распределение которой является искомой\footnote{Encyclopedia of Biostatistics}.
+Концепт достаточно сложный, поэтому зачастую пользователи относятся к нему как к чёрному ящику.
+Тем не менее, это важный элемент работы Stan (и всего Байесовского подхода в целом), с которым желательно ознакомиться.
+
+\newpage
+\subsection{Примеры моделей в Stan}
+\noindent
+Перед началом, убедитесь, что пакет {\tt{rstan}} подключен, а для вычислений задействовано максимально возможное число ядер (все команды указаны в секции 2.3).
+Процесс вычисления трудоёмкий (для железа) и занимает некоторое время.
+
+\subsubsection{Линейная модель с одной объясняющей переменной}
+\noindent
+Возьмём самый простой пример: одинарную линейную регрессию. 
+В привычном нам виде модель будет выглядеть следующим образом:
+
+  \begin{center}
+    $Y_i = \alpha + \beta X_i + \varepsilon_i$, где $\varepsilon_i \sim \mathcal{N}(0, \sigma^2)$
+  \end{center}
+  
+\noindent
+С помощью нехитрых преобразований получим:
+
+  \begin{center}
+    $Y_i - (\alpha + \beta X_i) \sim \mathcal{N}(0, \sigma^2)$ $\Rightarrow$ $Y_i \sim \mathcal{N}(\alpha + \beta X_i, \sigma^2)$
+  \end{center}
+  
+\noindent
+А наша модель будет иметь вид:
+
+<<LM_STAN, message = FALSE, warning = FALSE, eval = FALSE>>=
+model_lm <- "
+data {       
+  int<lower=0> n;   
+  vector[n] x;      
+  vector[n] y;      
+}
+parameters {            
+  real alpha;           
+  real beta;            
+  real<lower=0> sigma;  
+} 
+model {                 
+  y ~ normal(alpha + beta * x, sigma);
+}"
+@
+
+\noindent
+Собственно, вот и всё описание модели. 
+
+\begin{itemize}
+  \item В блоке {\tt{data}} содержится описание данных для ввода
+    \begin{itemize}
+      \item n - количество наблюдений, 
+      \item х - вектор объясняющей переменной,
+      \item y - вектор объясняемой переменной
+    \end{itemize}
+  \item Блок {\tt{parameters}} содержит, согласно своему названию, операторы
+  \item Блок {\tt{model}} содержит описание модели
+\end{itemize}
+Все просто и понятно, не правда ли? 
+Предлагаю протестировать нашу модель на каких нибудь данных. 
+В качестве примера подойдет набор данных {\tt{cars}}, встроенный в R: он содержит всего две переменные.
+
+<<dat, message = FALSE, warning = FALSE, eval = FALSE>>=
+# Сформируем данные для Stan
+cars_data <- list(n = nrow(cars),
+                  x = cars$speed, 
+                  y = cars$dist)
+
+# Запустим вычисление параметров
+lmtest_fit <- stan(model_code = model_lm, 
+                   data = cars_data, 
+                   iter = 1000, 
+                   chains = 4)
+@
+
+\noindent
+Обратите внимание, что названия вводимых данных в списке ({\tt{cars\_data}} в данном случае) должны соответствовать указанным в модели ({\tt{model\_lm}}). 
+Как и в R, регистр учитывается. Мы возьмём четыре цепи и 1000 итераций в каждой из них, чтобы у нас была возможность убедиться в том, что цепи сойдутся к апостериорному распределению. 
+
+\vspace{6pt}
+\noindent
+Результатом исполнения команды stan станет табличка следующего вида:
+
+\begin{small}
+<<result_lm, message = FALSE, warning = FALSE, echo = -c(1, 2), eval = TRUE>>=
+load("dat/all_fits.rda")
+options(width = 120)
+lmtest_fit
+@
+\end{small}
+
+\noindent
+В колонке {\tt{mean}}, очевидно, указаны средние оценки параметров\footnote{Загадочный параметр {\tt{lp\_\_}} является логарифмом апостериорной плотности (log posterior density) и его сходимость тоже важна. 
+Подробнее можно прочесть в инструкции Stan (стр. 351 и стр. 578) или в Интернете, например здесь: \url{https://www.jax.org/news-and-insights/jax-blog/2015/october/lp-in-stan-output}}.
+{\tt{sd}} - стандартное отклонение по выборке.
+{\tt{se\_mean}} - стандартная ошибка, однако, расчитывается она как {\tt{sd/sqrt(n\_eff)}}, a {\tt{n\_eff}} мы используем так как выборка зависимая.
+Далее идут квантили оценок, уже упомянутый  размер эффективной выборки {\tt{n\_eff}} и фактор уменьшения масштаба {\tt{R\_hat}}, который является мерой сходимости цепи.
+Если значение {\tt{R\_hat}} равно единице (с небольшими отклонениями), то можно считать, что цепь сошлась.
+Если же значения значительно разнятся, то цепь не сошлась.
+
+\vspace{6pt}
+\noindent
+Также можно вывести более подробный результат, воспользовавшись функцией {\tt{summary()}}.
+В отчёте также будет информация по цепям\footnote{Небольшой совет: командой {\tt{options(digits = \dots)}}, можно уменьшить количество символов в выводе. Так табличка компактнее и не разбивается на части при выводе.}.
+
+\begin{small}
+<<summary, message = FALSE, warning = FALSE, split = FALSE, echo = -1, eval = TRUE>>=
+options(digits = 3) 
+summary(lmtest_fit)
+@
+\end{small}
+
+\noindent
+Объект {\tt{lmtest\_fit}} является объектом {\tt{stanfit}}, как и многие другие сложные объекты, к примеру, объекты с геоданными, {\tt{SpatialPolygonDataFrame}}, о которых я писал в прошлой работе, состоит из слотов, к которым можно обратиться, введя команду типа {\tt{[objectname]@[slotname]}}. 
+Нас же больше всего интересует таблица с результатами. 
+В чистом виде (как слот) в объекте {\tt{lmtest\_fit}} она отсутствует, однако, мы можем получить апостериорную выборку параметров введя:
+
+<<lm_array, message = FALSE, warning = FALSE, eval = TRUE>>=
+lm_array <- as.array(lmtest_fit)
+@
+
+\noindent
+Полученный объект является трёхмерным массивом [номер итерации, номер цепи, параметр]. 
+То есть, допустим, если нас интересует параметр $\beta$, то мы можем получить его, указав соответствующий номер параметра.
+Посмотрим на первые 5 значений каждой цепи:
+
+<<lm_array_betas, message = FALSE, warning = FALSE, echo = -1, eval = TRUE>>=
+options(digits = 4)
+head(lm_array[, , 2], 5) #выбран параметр beta
+@
+
+\noindent
+В качестве интереса, можно провести небольшое сравнение с обычным МНК:
+
+<<OLS, message = FALSE, warning = FALSE>>=
+OLS_fit <- lm(dist ~ speed, data = cars)
+summary(OLS_fit)
+@
+
+\noindent
+и обнаружить, что полученные значения очень похожи:
+<<compare, >>=
+OLS_fit$coefficients
+c(mean(lm_array[, , 1]), mean(lm_array[, , 2]))
+@
+
+\subsubsection{Линейная модель с несколькими объясняющими переменными}
+\noindent
+Теперь построим регрессию от нескольких объясняющих переменных. 
+В качестве примера возьмём набор данных {\tt{mtcars}}, содержащий 11 переменных.
+Построим следующую модель:
+
+\begin{center}
+    $mpg_i = \alpha + \beta_1 wt_i + \beta_2 am_i + \beta_3 hp_i + \varepsilon_i$, \\ 
+    где $\varepsilon_i \sim \mathcal{N}(0, \sigma^2)$
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+В Stan же её можно отобразить как:
+
+<<LM2_STAN, message = FALSE, warning = FALSE, eval = FALSE>>=
+model_lm2 <- "
+data {       
+  int<lower=0> n;
+  int<lower=0> k;
+  matrix[n, k] X;      
+  vector[n] y;      
+}
+parameters {            
+  real alpha;           
+  vector[k] beta;            
+  real<lower=0> sigma;  
+} 
+model {
+  alpha ~ normal(0, 1000);
+  y ~ normal(alpha + X * beta, sigma);
+}"
+@
+
+\noindent
+Существенных изменений нет, однако теперь, поскольку у нас несколько регрессоров, мы указали их как матрицу X (при желании, в неё можно спрятать и единичный вектор).
+Также я явно ввел априорное распределение для $\alpha$, допустив, что оно распределено нормально: $\alpha \sim \mathcal{N}(0, 1000)$.
+При этом Stan неявно задаст равномерное распределение, а именно: $\alpha \sim Uniform[-\infty, +\infty]$.
+Значения $\beta$ теперь тоже должны храниться в соответствующем векторе.
+
+\vspace{6pt}
+\noindent
+Соберём данные для нашей модели:
+
+<<dat2, message = FALSE, warning = FALSE, eval = FALSE>>=
+#Сформируем данные для Stan
+cars_data <- list(n = nrow(mtcars),
+                  k = 3,
+                  X = cbind(mtcars$wt, mtcars$am, mtcars$hp), 
+                  y = mtcars$mpg)
+@
+
+\noindent
+И запустим её:
+
+<<stango02, message = FALSE, warning = FALSE, eval = FALSE>>=
+lm3_fit1 <- stan(model_code = model_lm2,
+                 data = mtcars_data1,
+                 iter = 1000,
+                 chains = 4)
+@
+
+\noindent
+Получим следующий результат:
+
+\begin{small}
+<<results_2, message = FALSE, warning = FALSE>>=
+lm3_fit1
+@
+\end{small}
+
+\noindent
+Командой {\tt{traceplot()}} (или абсолютно аналогичной ей {\tt{stan\_trace()}}) можно попробовать визуально оценить сходимость рядов, предварительно указав искомый параметр. 
+Допустим, меня интересуют основные коэффициенты регрессии. 
+
+<<traceplot01, message = FALSE, warning = FALSE, eval = TRUE, echo = -c(1, 3), results = 'hide'>>=
+cairo_pdf("plot003.pdf", pointsize = 25, width = 10, height = 5)
+stan_trace(lm3_fit1, pars = c("alpha", "beta[1]", "beta[2]", "beta[3]"))
+dev.off()
+@
+
+\newpage
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot003.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Также добавим скрипичный график:
+
+<<violins, message = FALSE, warning = FALSE, eval = TRUE, echo = -c(1, 3), results = 'hide'>>=
+cairo_pdf("plot006.pdf", pointsize = 15, width = 10, height = 5)
+mcmc_violin(as.array(lm3_fit1), 
+            pars = c("alpha", "beta[1]", "beta[2]", "beta[3]"))
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot006.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Вроде никаких отклонений не заметно. 
+
+\vspace{6pt}
+\noindent
+Предлагаю сделать несколько более строгое предположение касательно $\alpha$. 
+Допустим, что $\alpha$ распределено нормально, но с маленькой дисперсией.
+Тогда наша модель примет вид:
+
+<<LM2_STAN_restr, message = FALSE, warning = FALSE, eval = FALSE>>=
+restrictive_lm2 <- "
+data {       
+  int<lower=0> n;
+  int<lower=0> k;
+  matrix[n, k] X;      
+  vector[n] y;      
+}
+parameters {            
+  real alpha;           
+  vector[k] beta;            
+  real<lower=0> sigma;  
+} 
+model {
+  alpha ~ normal(0, 2);
+  y ~ normal(alpha + X * beta, sigma);
+}"
+@
+
+\noindent
+Запустим вычисления:
+
+<<stango02_1, message = FALSE, warning = FALSE, eval = FALSE>>=
+lm3_fit1_2 <- stan(model_code = restrictive_lm2,
+                 data = mtcars_data1,
+                 iter = 1000,
+                 chains = 4)
+@
+
+\noindent
+И посмотрим на результат:
+
+<<violins2, message = FALSE, warning = FALSE, eval = TRUE, echo = -c(1, 3), results = 'hide'>>=
+cairo_pdf("plot022.pdf", pointsize = 15, width = 10, height = 5)
+mcmc_areas(as.array(lm3_fit1_2), 
+            pars = c("alpha", "beta[1]", "beta[2]", "beta[3]"))
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot022.pdf}
+  \end{center}
+\end{figure}
+
+\begin{small}
+<<results_2_1, message = FALSE, warning = FALSE>>=
+lm3_fit1_2
+@
+\end{small}
+
+\noindent
+Заметно, что значение $\alpha$ стало значительно ниже.
+Изменились значения и других параметров. 
+Однако, стоит отметить, что сделанное нами предположение чересчур смелое, и у нас не хватило данных, чтобы оно перестало оказывать влияние на апостериорную выборку. 
+Иными словами, у нас не хватило информации, чтобы изменить первоначальное суждение.
+Допустим, если в априорном распределении указать {\tt{alpha $\sim$ normal(0, 10)}}, то мы получим следующий результат:
+
+\begin{small}
+<<results_2_2, message = FALSE, warning = FALSE>>=
+lm3_fit1_3
+@
+\end{small}
+
+\noindent
+Который гораздо ближе к тому, что был изначально. 
+Таким образом, наше априорное суждение о распределении параметров обладает влиянием на апостериорное.
+Графически это можно увидеть, построив графики априорного и апостериорного распределений.
+Для вывода априорного распределения в Stan, можно попросту написать:
+
+<<stan_prior, message = FALSE, warning = FALSE, eval = FALSE>>=
+for_prior <- "
+parameters{
+real alpha;
+}
+model{
+alpha ~ normal(0, 1000);
+}"
+
+prior <- stan(model_code = for_prior,
+                 iter = 1000,
+                 chains = 4)
+@
+
+\noindent
+А затем построить графики распределений:
+
+<<prior_n_post, message = FALSE, warning = FALSE, results = 'hide', echo = -c(1,3,4,6)>>=
+cairo_pdf("plot028.pdf", pointsize = 25, width = 5, height = 5)
+mcmc_hist(as.array(prior), pars = "alpha")
+dev.off()
+cairo_pdf("plot029.pdf", pointsize = 25, width = 5, height = 5)
+mcmc_hist(as.array(lm3_fit1), pars = "alpha")
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{multicols}{2}
+    \hfill
+    \includegraphics[width=80mm]{plot028.pdf}
+    \hfill
+    \hfill
+    \includegraphics[width=80mm]{plot029.pdf}
+    \hfill
+  \end{multicols}
+\end{figure}
+
+\noindent
+Форма распределения осталась прежней, однако постериорное центрировано примерно у 34 и обладает меньшей дисперсией.
+
+\subsubsection{Модели бинарного выбора}
+\noindent
+Перейдём к моделям для предсказывания вероятностей. 
+В этих моделях мы объясняем переменную бинарного типа ($y_i$), которая может принимать значения 1 или 0. 
+И чтобы её объяснить, мы вводим некую ненаблюдаемую скрытую переменную ($y_i^*$), так чтобы:
+
+  \begin{center}
+  \[
+    y_i =
+    \begin{cases}
+        $0, если$ & y_i^* < 0; \\
+        $1, если$ & y_i^* \geqslant 0
+    \end{cases}
+  \]
+  \vspace{6pt}
+  где $y_i^* = \alpha + \beta_1 x_i + \beta_2 z_i + \dots + \varepsilon_i$ \\
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+В случае логит-модели $\varepsilon_i \sim logistic$, а функция плотности представляет из себя 
+  
+  \begin{center}
+    $f(t) = \cfrac{e^{-t}}{(1 + e^{-t})^2}$
+  \end{center}
+
+\vspace{6pt}
+\noindent
+и в целом похожа на $\mathcal{N}(0, 1.6^2)$. В терминах вероятности получим, что:
+
+  \begin{center}
+    $P(y_i = 1) = P(y_i^* \geqslant 0) = $\\ \vspace{4pt}
+    $P(\alpha + \beta_1 x_i + \beta_2 z_i + \dots + \varepsilon_i \geqslant 0) = 
+    P(\varepsilon_i \leqslant \alpha + \beta_1 x_i + \beta_2 z_i + \dots) = $ \\ \vspace{4pt}
+    $F(\alpha + \beta_1 x_i + \beta_2 z_i + \dots)$
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+Где $F(t)$ - уже функция распределения вероятности. Очевидно, что:
+  \begin{center}
+    $P(y_i = 0) = 1 - F(t)$.
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+Теперь отобразим эту модель в Stan. 
+Практиковаться я предлагаю на наборе данных {\tt{titanic}}. 
+Отмечу, что в R есть и свой, встроенный, набор данных {\tt{Titanic}}, но он представлен в виде многомерного массива и скуден на переменные. 
+Набор {\tt{titanic}} можно найти в Интернете, а можно получить, установив пакет {\tt{titanic}}. 
+Бросим взгляд на наши данные:
+
+<<glimpse, message = FALSE, warning = FALSE, eval = TRUE>>=
+glimpse(titanic_train, width = 60)
+@
+
+\noindent
+Прогнозировать будем переменную {\tt{Survived}} по переменным {\tt{Sex, Age, Fare, Pclass}}. 
+Но для начала надо нужно преобразовать переменную {\tt{Sex}} в числовой формат, и на всякий случай очистить от пропущенных значений:
+
+<<datalogit_STAN, message = FALSE, warning = FALSE, eval = TRUE>>=
+df_titan <- mutate(titanic_train, 
+                   Sex = as.numeric(
+                     as.factor(titanic_train$Sex)) - 1)
+df_titan <- na.omit(df_titan)
+glimpse(df_titan$Sex)
+@
+
+\noindent
+Отлично, теперь {\tt{male = 1}}, а {\tt{female = 0}}. 
+Опишем нашу модель в Stan:
+
+<<logit_STAN, message = FALSE, warning = FALSE, echo = TRUE, eval = FALSE>>=
+model_logit <- "
+data {
+  int<lower=0> N;
+  int<lower=0> k;
+  vector[N] Sex;
+  vector[N] Pclass;
+  vector[N] Age;
+  vector[N] Fare;
+  int<lower=0,upper=1> Surv[N];
+}
+parameters {
+  real alpha;
+  real beta[k];
+}
+model {
+  Surv ~ bernoulli_logit(alpha + beta[1] * Sex + beta[2] * Pclass + 
+                               beta[3] * Age + beta[4] * Fare);
+}"
+@
+
+\noindent
+Объект с кодом модели пришлось немного преобразить. 
+Во-первых, в этот раз мы ввели каждую переменную отдельно, чтобы их было проще распознавать 
+(и чтобы показать альтернативный способ записи). 
+Во-вторых, описали распределение как {\tt{bernoulli\_logit}}.
+
+\vspace{6pt}
+\noindent
+Соберем данные и запустим Stan:
+
+<<stango_logit, message = FALSE, warning = FALSE, eval = FALSE>>=
+logit_data <- list(N = nrow(df_titan),
+                   k = 4,
+                   Sex = df_titan$Sex,
+                   Pclass = df_titan$Pclass,
+                   Age = df_titan$Age,
+                   Fare = df_titan$Fare,
+                   Surv = df_titan$Survived)
+
+logittest_fit <- stan(model_code = model_logit, 
+                   data = logit_data, 
+                   iter = 1000, 
+                   chains = 4)
+@
+
+\noindent
+Результат:
+
+\begin{small}
+<<results_3, message = FALSE, warning = FALSE>>=
+logittest_fit
+@
+\end{small}
+
+\noindent
+В целом, наши оценки выглядят адекватно. 
+
+\vspace{6pt}
+\noindent
+Проверим ряды на сходимость:
+
+<<check_conv, message = FALSE, warning = FALSE, echo = -c(1, 3), results = 'hide', eval = TRUE>>=
+cairo_pdf("plot007.pdf", pointsize = 15, width = 10, height = 4)
+stan_trace(logittest_fit)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot007.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+По графикам видно, что цепи сходятся, поэтому будем считать нашу модель приемлемой. 
+Теперь посмотрим на графики распределения:
+
+<<violin_3, message = FALSE, warning = FALSE, echo = -c(1, 2, 5), results = 'hide', eval = TRUE>>=
+cairo_pdf("plot008.pdf", pointsize = 25, width = 12, height = 2.8)
+par(mfrow = c(1, 1))
+logit_array <- as.array(logittest_fit)
+mcmc_areas(logit_array, 
+           pars = c("alpha", 
+                    "beta[1]", "beta[2]", "beta[3]", "beta[4]"))
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot008.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+На этом графике хорошо видно, что значения коэффициентов при возрасте ({\tt{beta[3]}}) и тарифе ({\tt{beta[4]}}) близки к 0.
+
+\vspace{6pt}
+\noindent
+Схожим образом можно построить и пробит-модель.
+Для кода Stan нужно ввести некоторые преобразования.
+Напомню, что в пробит-модели $\varepsilon_i \sim \mathcal{N}(0, 1)$.
+А функция распределения вероятности имеет вид:
+
+  \begin{center}
+    $\Phi(x) = {\displaystyle \int\limits_{-\infty}^x \mathcal{N}(y|0, 1)dy} = 
+    {\displaystyle \cfrac{1}{\sqrt{2\pi}} \int\limits_{-\infty}^x e^-\frac{z^2}{2}dz}$
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+В Stan эта функция существует как {\tt{Phi}}.
+Также есть более быстрая упрощённая функция {\tt{Phi\_approx}}. 
+В самой модели мы откажемся от векторной формулировки и опишем данные как ряды.
+В целом ничего не изменится, однако в блоке {\tt{model}} нужно будет воспользоваться циклом {\tt{for}}.
+Запись {\tt{for}} в Stan такая же, как и в R.
+
+<<probit_STAN, message = FALSE, warning = FALSE, eval = FALSE>>=
+model_probit <- "
+data {
+  int<lower=0> N;
+  int<lower=0> k;
+  int<lower=0,upper=1> Sex[N];
+  int<lower=1,upper=3> Pclass[N];
+  real Age[N];
+  int<lower=0,upper=1> Surv[N];
+}
+parameters {
+  real alpha;
+  real beta[k];
+}
+model {
+  for (n in 1:N)
+    Surv[n] ~ bernoulli(Phi(alpha + beta[1] * Sex[n] + 
+        beta[2] * Pclass[n] + beta[3] * Age[n]));
+}"
+@
+
+\noindent
+Как всегда, соберем данные и запустим Stan:
+
+<<stango_probit, message = FALSE, warning = FALSE, eval = FALSE>>=
+probit_data <- list(N = nrow(df_titan),
+                    k = 3,
+                    Sex = df_titan$Sex,
+                    Pclass = df_titan$Pclass,
+                    Age = df_titan$Age,
+                    Surv = df_titan$Survived)
+
+probittest_fit <- stan(model_code = model_probit, 
+                      data = probit_data, 
+                      iter = 1000, 
+                      chains = 4)
+@
+
+\noindent
+Я отбросил переменную {\tt{Fare}} чтобы вычисления происходили несколько быстрее.
+Получится следующий результат:
+
+\begin{small}
+<<result_probit, message = FALSE, warning = FALSE>>=
+probittest_fit
+@
+\end{small}
+
+\subsubsection{Временные ряды}
+\noindent
+В Stan можно описать и модели временных рядов.
+Данная работа не будет фокусироваться на временных рядах, но я счёл необходимым добавить их в это руководство для полноты картины.
+Делается это так же, как и в примере с пробит-моделью: в блоке {\tt{model}} нужно добавить цикл {\tt{for}} и описать модель с лагом.
+В качестве примера мы рассмотрим AR модели и прогнозирование временных рядов.
+  
+\noindent
+Итак, приступим.
+
+\vspace{6pt}
+{\bf{Модель AR(1)}}
+
+\vspace{6pt}
+\noindent
+Для начала вспомним, что представляет из себя авторегрессионный процесс первого порядка.
+Математически он описывается следующим образом:
+
+  \begin{center}
+    $y_t = \beta y_{t-1} + \varepsilon_t$, \qquad $\varepsilon_t \sim iid(0, \sigma^2)$, \qquad $t = 1, \dots, n$.
+  \end{center}
+  
+\vspace{6pt}
+\noindent
+В Stan эту модель можно описать так:
+
+<<AR1_STAN, message = FALSE, warning = FALSE, eval = FALSE>>=
+model_AR1 <- "
+data {
+  int<lower=0> N;
+  vector[N] y;
+}
+parameters {
+  real beta;
+  real<lower=0> sigma;
+} 
+model {
+  for (n in 2:N)
+    y[n] ~ normal(beta * y[n-1], sigma);
+}"
+@
+
+\noindent
+Попрактиковаться я предлагаю на финансовых данных, например, на стоимости акций Google.
+Нам понадобится пакет {\tt{quantmod}} и функция {\tt{getSymbols}}.
+
+<<getData, message = FALSE, warning = FALSE, eval = TRUE, results = 'hide'>>=
+Sys.setlocale("LC_TIME", "C") # Перевод времени в англ. формат
+getSymbols("GOOG", 
+           from = "2010-05-13", 
+           to = "2017-05-13", 
+           src = "yahoo")
+# Нас будут интересовать скорректированные цены закрытия
+GOOG <- GOOG[, "GOOG.Adjusted", drop = F]
+@
+
+\noindent
+Для начала предлагаю посмотреть, что из себя представляет ряд GOOG:
+
+<<GOOG, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot020.pdf", pointsize = 7, width = 10, height = 5)
+ggtsdisplay(GOOG)
+dev.off()
+@
+
+\newpage
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot020.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Судя по графикам автокорреляции и частичной автокорреляции, процесс похож на случайное блуждание.
+Теперь создадим список входных данных и запустим Stan:
+
+<<AR1_GO, message = FALSE, warning = FALSE, eval = FALSE>>=
+AR1_data <- list(N = length(GOOG),
+                 y = as.vector(GOOG))
+AR1_fit <- stan(model_code = model_AR1,
+                data = AR1_data,
+                iter = 1000,
+                chains = 4)
+@
+
+\noindent
+Результат:
+
+\begin{small}
+<<AR1_result, message = FALSE, warning = FALSE>>=
+AR1_fit
+@
+\end{small}
+
+\vspace{6pt}
+{\bf{Модель AR(p)}}
+
+\vspace{6pt}
+\noindent
+В случае с авторегрессионным процессом порядка $p$, изменения в описании небольшие. 
+Количество лагов задаётся тем же путём, что и количество объясняющих переменных в линейных моделях, что мы рассматривали ранее.
+
+<<ARp_STAN, message = FALSE, warning = FALSE, eval = FALSE>>=
+ARp_model <- "
+data {
+  int<lower=0> K;
+  int<lower=0> N;
+  real y[N]; 
+}
+parameters {
+  real alpha;
+  real beta[K];
+  real sigma;
+} 
+model {
+  for (n in (K+1):N) {
+    real mu;
+    mu = alpha;
+    for (k in 1:K)
+    mu = mu + beta[k] * y[n-k];
+    y[n] ~ normal(mu, sigma);
+    } 
+}"
+
+ARp_data <- list(N = length(GOOG),
+                 K = 3,
+                 y = as.vector(GOOG))
+
+ARp_fit <- stan(model_code = ARp_model,
+                data = ARp_data,
+                iter = 1000,
+                chains = 4)
+@
+
+\noindent
+В данном случае в нашей модели 3 лага и есть константа.
+
+  \begin{center}
+    $y_t = \alpha + \beta_1 y_{t-1} + \beta_2 y_{t-2} + \beta_3 y_{t-3}$
+  \end{center}
+
+\vspace{6pt}
+\noindent
+Получаем следующий результат:
+
+\begin{small}
+<<ARp_result, message = FALSE, warning = FALSE>>=
+ARp_fit
+@
+\end{small}
+
+% МА модель - пока нет
+
+\newpage
+\subsection{Многоуровневые модели}
+\noindent
+Многоуровневые модели --- это отдельный класс моделей, в которых параметры могут разниться на разных уровнях.
+В качестве примерво можно привести успеваемость учеников/студентов в разных школах/группах, смертность от некоторого заболевания у пациентов в разных больницах и так далее.
+Многоуровневые модели также называются иерархическими по двум причинам: во-первых, из-за структуры данных (студенты объединяются в кластеры: классы/школы), а во-вторых, у каждой модели есть своя иерархия --- параметры регрессии внутри школы на низшем уровне контролируются гиперпараметрами на высшем уровне\footnote{A. Gelman, J. Hill, <<Data Analysis Using Regression and Multilevel/Hierarcical Models>>, Cambridge University press, 2007, p.2}.
+Разумно подразумевать, что кластеры не идентичны, но могут быть похожими.
+Поэтому мы можем использовать знания об одном кластере (или нескольких), чтобы оценить другой.
+Такой подход увеличивает точность оценивания.
+Рассмотрим другой пример\footnote{Richard McElreath, <<Statistical Rethinking>>, 2015, pp.370-371}: Вы хотите оценить время подачи кофе в нескольких кафе.
+Вначале Вы ничего не знаете, и делаете (априорное) предположение, что время подачи в среднем 5 минут, а дисперсия мала (допустим, 1).
+В первом кафе Вам принесли кофе за 4 минуты.
+Теперь, когда Вы будете заходить во второе кафе, вы будете пользоваться этой информацией, ведь Ваше априорное мнение о времени подачи изменилось: постериорное распределение для первого кафе станет априорным для второго.
+Повторив этот <<эксперимент>> много раз, Вы получите некоторое распределение.
+Если у него большая дисперсия, то его информативность мала, и Вам сложнее оценить время подачи в следующем кафе.
+В случае с маленькой дисперсией, мы можем более точно угадать время подачи.
+
+\vspace{6pt}
+\noindent
+Таким образом, многоуровневые модели запоминают свойства разных кластеров, собирая полученную информацию воедино, что улучшает оценки каждого кластера.
+Среди сильных моментов этих моделей можно выделить:
+
+  \begin{enumerate}
+    \item {\bf{Улучшенные оценки при повторной выборке}}. 
+          При взятии нового наблюдения с того-же индивида (места, времени) обычная одноуровневая модель может вызвать недо- или переподгонку (слишком слабая или сильная чувствительность к колебаниям в данных). 
+          Часто происходит при большом количестве переменных.
+    \item {\bf{Улучшенные оценки при дисбалансе в выборке.}}
+          В случае, когда от одного и того же индивида было получено несколько наблюдений (больше, чем от других), многоуровнеые модели самостоятельно справляются с наличием большего количества информации в некоторых кластерах.
+          Более того, они не трансформируют данные (к примеру, усреднение может привести к потере дисперсии).
+    \item {\bf{Дисперсия}}.
+          В многоуровневых моделях дисперсия моделируется явно, что может быть полезно, если нас интересует дисперсия среди индивидов или групп.
+  \end{enumerate}
+  
+\vspace{6pt}
+\noindent
+Вышеперечисленные достоинства достаточно хороши, чтобы считать многоуровневую модель моделью по умолчанию.
+В большинстве случаев она будет справляться лучше, чем одноуровневая.
+И лишь в случае её ненужности, от неё можно отказаться.
+Освоив иерархические модели, можно даже в какой-то степени закрыть глаза на ошибку в измерении и даже моделировать отсутсвующие данные.
+
+\vspace{6pt}
+\noindent
+Теперь перейдём к примерам\footnote{Примеры взяты отсюда: \url{http://astrostatistics.psu.edu/su14/lectures/Daniel-Lee-Stan-2.pdf}} в Stan.
+Поскольку Stan создавался, чтобы работать с иерархическими моделями, его разработчики заранее добавили набор данных Eight Schools\footnote{A. Gelman, J. B. Carlin, H. S. Stern, D. B. Dunson, Aki Vehtari, D. B. Rubin, <<Bayesian Data Analysis>>, CRC Press, 2014, pp.119-124.}.
+Данные выглядят следующим образом:
+
+  \begin{figure}
+    \begin{tabular}[bh]{|p{6.5em}|p{6.5em}|p{6.5em}|}
+      \hline
+      Школа & $y_j$ & $\sigma_j$ \\
+      \hline
+      A & 28 & 15 \\
+      B & 8 & 10 \\
+      C & -3 & 16 \\
+      D & 7 & 11 \\
+      E & -1 & 9 \\
+      F & 1 & 11 \\
+      G & 18 & 10 \\
+      H & 12 & 18 \\
+      \hline
+    \end{tabular}
+  \end{figure}
+  
+\noindent
+А в R:
+
+<<schooldata, message = FALSE, warning = FALSE>>=
+data_8schools <- list(J = 8, 
+                      y = c(28,  8, -3,  7, -1,  1, 18, 12),
+                      sigma = c(15, 10, 16, 11,  9, 11, 10, 18))
+@
+
+\vspace{6pt}
+{\bf{Модель без объединения информации}}
+
+\vspace{6pt}
+\noindent
+Каждую школу будем оценивать отдельно.
+Код модели:
+
+<<8nopool, message = FALSE, warning = FALSE>>=
+m8schools_nopool <- "
+data {
+  int<lower=0> J;         
+  real y[J];               
+  real<lower=0> sigma[J];  
+}
+parameters {
+  real theta[J];
+} 
+model {
+  y ~ normal(theta, sigma);
+}"
+@
+
+\noindent
+Запустим нашу модель:
+
+<<stanhiergo, message = FALSE, warning = FALSE, eval = FALSE>>=
+nopool_fit <- stan(model_code = m8schools_nopool, data = data_8schools, 
+                   iter = 1000, chains = 4)
+@
+
+\noindent
+И получим следующий результат:
+
+<<res_hier1, message = FALSE, warning = FALSE>>=
+nopool_fit
+@
+
+\noindent
+Полученные оценки $theta$ в целом не отличаются от первоначальных $y_j$. 
+Также проверим сходимость цепей:
+
+<<converge_hier1, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot031.pdf", pointsize = 10, width = 6, height = 3)
+stan_trace(nopool_fit)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot031.pdf}
+  \end{center}
+\end{figure}
+
+\vspace{6pt}
+{\bf{Модель с полным объединением информации}}
+
+\vspace{6pt}
+\noindent
+Теперь вся информация о школах будет объединена.
+
+<<8fullpool, message = FALSE, warning = FALSE>>=
+m8schools_fullpool <- "
+data {
+   int<lower=0> J;          
+   real y[J];              
+   real<lower=0> sigma[J];  
+}
+parameters {
+  real theta; //теперь theta общая
+} 
+model {
+  y ~ normal(theta, sigma);
+}"
+
+fullpool_fit <- stan(model_code = m8schools_fullpool, data = data_8schools, 
+                   iter = 1000, chains = 4)
+@
+
+<<res_hier2, message = FALSE, warning = FALSE>>=
+fullpool_fit
+@
+
+\noindent
+Мы получили средний эффект по всем школам.
+Cходимость цепей:
+
+<<converge_hier2, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot032.pdf", pointsize = 7, width = 6, height = 1.1)
+stan_trace(fullpool_fit)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot032.pdf}
+  \end{center}
+\end{figure}
+
+\vspace{6pt}
+{\bf{Модель с неполным объединением информации}}
+
+\vspace{6pt}
+\noindent
+Добавим некоторое $\tau$, как меру ковариации между школами.
+Также оценим гиперпараметр $\mu$.
+
+<<8partpool, message = FALSE, warning = FALSE>>=
+m8schools_partpool <- "
+data {
+  int<lower=0> J;          
+  real y[J];               
+  real<lower=0> sigma[J];  
+  real<lower=0> tau;
+}
+parameters {
+  real theta[J];
+  real mu;
+} 
+model {
+  theta ~ normal(mu, tau);
+  y ~ normal(theta, sigma);
+}"
+@
+
+<<stanhiergo3, message = FALSE, warning = FALSE, eval = FALSE>>=
+data_8schools_t25 <- list(J = 8, 
+                      y = c(28,  8, -3,  7, -1,  1, 18, 12),
+                      sigma = c(15, 10, 16, 11,  9, 11, 10, 18),
+                      tau = 25)
+
+partpool_fit <- stan(model_code = m8schools_partpool, data = data_8schools_t25, 
+                     iter = 1000, chains = 4)
+@
+
+<<res_hier3, message = FALSE, warning = FALSE>>=
+partpool_fit
+@
+
+\noindent
+Мы получили оценку гиперпараметра $\mu$ (высокий уровень), который влияет на значения $\theta$, индивидуальные для каждого кластера (низший уровень).
+Cходимость цепей:
+
+<<converge_hier3, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot033.pdf", pointsize = 10, width = 6, height = 6)
+stan_trace(partpool_fit)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot033.pdf}
+  \end{center}
+\end{figure}
+
+\newpage
+\vspace{6pt}
+{\bf{Иерархическая модель}}
+
+\vspace{6pt}
+\noindent
+Теперь мы оцениваем и гиперпараметр, и ковариацию.
+
+<<8hier, message = FALSE, warning = FALSE>>=
+m8schools_hier <- "
+data {
+  int<lower=0> J;          
+  real y[J];               
+  real<lower=0> sigma[J];  
+}
+parameters {
+  real theta[J];
+  real mu;
+  real<lower=0> tau;
+} 
+model {
+  theta ~ normal(mu, tau);
+  y ~ normal(theta, sigma);
+}"
+@
+
+<<hier_fit, message = FALSE, warning = FALSE, eval = FALSE>>=
+hier_fit <- stan(model_code = m8schools_hier, data = data_8schools, 
+                   iter = 1000, chains = 4)
+@
+
+<<res_hier4, message = FALSE, warning = FALSE>>=
+hier_fit
+@
+
+\noindent
+Мы получили оценки гиперпараметра и ковариации.
+Cходимость цепей:
+
+<<converge_hier4, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot034.pdf", pointsize = 7, width = 6, height = 6)
+stan_trace(hier_fit)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot034.pdf}
+  \end{center}
+\end{figure}
+
+\newpage
+\subsection{Способы проверки цепей на сходимость} %блок самостоятелен, копировать и переставлять только в этом виде!
+\noindent
+Теперь перейдём к проверке сходимости цепей к апостериорному распределению. 
+Замечу, что это очень важный пункт в использовании Байесовского подхода, так как определяет качество модели и сигнализирует о возможном наличии ошибок.
+Есть несколько способов проверить цепь на сходимость. 
+Разберём некоторые из них на примере нашей простой модели.
+
+\vspace{6pt}
+{\bf{Среднее значение цепи}} \\
+\noindent
+Очевидно, нам нужно оценить среднее для каждой цепи. 
+
+<<lm_array_betas_means, message = FALSE, warning = FALSE, eval = TRUE>>=
+# Среднее для каждой цепи по отдельности
+apply(lm_array[, , 2], 2, mean)
+# Среднее по всем цепям
+mean(lm_array[, , 2]) #среднее по alpha и beta
+@
+
+\noindent
+Как мы видим, значения не сильно отличаются друг от друга, так что можно считать, что скорее всего цепи сошлись. 
+Чтобы судить об этом точнее, а главное, без вычислений, мы можем попробовать отобразить цепи графически. 
+
+\vspace{6pt}
+{\bf{Графические способы}} \\
+\noindent
+Для начала сделаем это самым простым и банальным способом: с помощью функции {\tt{plot()}}, предварительно поместив значения $\beta$ в объект {\tt{betas}} типа {\tt{dataframe}}:
+
+<<abomination, message = FALSE, warning = FALSE, echo = -c(2, 11), eval = TRUE, results = 'hide'>>=
+betas <- as.data.frame(lm_array[, , 2])
+cairo_pdf("plot001.pdf", pointsize = 25, width = 20, height = 10)
+plot(range(1:nrow(betas)), range(2:6), 
+     type = "n", 
+     xlab = "Индекс", 
+     ylab = "Значение",
+     main = "Анализ сходимости рядов для beta")
+lines(betas$`chain:1`, col = "red")
+lines(betas$`chain:2`, col = "blue")
+lines(betas$`chain:3`, col = "green")
+lines(betas$`chain:4`, col = "orange")
+abline(a = 4, b = 0)
+labs <- c("chain 1", "chain 2", "chain 3", "chain 4")
+legend("topleft", legend = labs, horiz = TRUE,
+       bg = "transparent", cex = 1.1, 
+       text.col = c("red", "blue", "green", "orange"))
+dev.off()
+@
+
+\newpage
+  \begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot001.pdf}
+  \end{center}
+  \end{figure}
+
+\noindent
+Мы получили нечто в жанре абстракционизма-минимализма. 
+В целом, график похож на сходящиеся ряды, но можно сделать намного проще. 
+В пакет {\tt{rstan}} уже включена функция {\tt{traceplot()}} для вызова которой не требуется конвертация в {\tt{dataframe}}, а также можно вместо индекса переменной указать необходимый параметр, что, несомненно, интуитивно понятнее:
+
+<<prettyplot, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = FALSE, results = 'hide'>>=
+cairo_pdf("plot005.pdf", pointsize = 30, width = 8, height = 3)
+traceplot(lmtest_fit, pars = "beta")
+dev.off()
+@
+
+\begin{figure}[H]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot005.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Также мы можем визуализировать интервалы для параметров, введя:
+
+<<intervals, message = TRUE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot002.pdf", pointsize = 15, width = 8, height = 2)
+plot(lmtest_fit)
+dev.off()
+@
+
+\newpage
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot002.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Ещё, более наглядным способом, на мой взгляд, будет построить диаграммы в виде скрипки. 
+Сделать это можно стандартной командой {\tt{violinBy()}} с объектом {\tt{array}}. 
+
+<<violin_1, message = FALSE, warning = FALSE, echo = -c(1, 4), results = 'hide', eval = FALSE>>=
+cairo_pdf("plot004.pdf", pointsize = 15, width = 10, height = 5)
+#График для beta
+violinBy(lm_array[, , 2], main = "speed")
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot004.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Сходимость цепей можно определить по форме диаграмм. 
+Если они похожи, то закон распределения в каждой цепи одинаковый, и, стало быть, цепи сошлись.
+
+\noindent
+Также, для визуального анализа я рекомендую воспользоваться пакетом {\tt{shinystan}}. 
+С помощью команды {\tt{launch\_shinystan()}}:
+
+<<shinystan!, message = FALSE, warning = FALSE, eval = FALSE>>=
+launch_shinystan(lmtest_fit)
+@
+
+\noindent
+откроется окно в браузере (подключение к Интернету не требуется, вычисления происходят локально) с главной страницей shinytstan. 
+Перейдя по ссылкам, можно в интерактивном режиме исследовать модель.
+
+\newpage
+\begin{figure}[H]
+  \begin{center}
+    \includegraphics[width=\textwidth]{picture001.png}
+  \vspace{2pt}
+    \includegraphics[width=\textwidth]{picture002.png}
+  \vspace{2pt}
+    \includegraphics[width=\textwidth]{picture003.png}
+  \end{center}
+\end{figure}
+
+\newpage
+\noindent
+Также для визуализации сходимости и прочих других данных, полученных в процессе анализа, рекомендую использовать пакет {\tt{bayesplot}}\footnote{Примеры можно найти здесь: \url{https://cran.r-project.org/web/packages/bayesplot/vignettes/MCMC.html}}.
+Пакет содержит функции для уже продемонстрированных графиков, а также некоторые собственные. 
+Покажу несколько примеров:
+
+<<bp_intervals, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(3, 6), results = 'hide'>>=
+#Уже знакомый нам график интервалов, 
+#можно самому указать границы вероятности:
+cairo_pdf("plot012.pdf", pointsize = 10, width = 6, height = 2)
+mcmc_intervals(lm_array, pars = c("alpha", "beta", "sigma"), 
+               prob = 0.5, prob_outer = 0.99)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot012.pdf}
+  \end{center}
+\end{figure}
+
+<<bp_areas, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(3, 9), results = 'hide'>>=
+#График плотностей, можно самому указать границы вероятности,
+#оценить можно среднее или медиану:
+cairo_pdf("plot013.pdf", pointsize = 10, width = 6, height = 2)
+mcmc_areas(lm_array, 
+           pars = c("alpha", "beta", "sigma"),
+           prob = 0.5,
+           prob_outer = 0.99,
+           point_est = "mean")
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot013.pdf}
+  \end{center}
+\end{figure}
+
+<<bp_hist, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(2, 4), results = 'hide'>>=
+#Гистограммы:
+cairo_pdf("plot014.pdf", pointsize = 10, width = 6, height = 3)
+mcmc_hist(lm_array)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot014.pdf}
+  \end{center}
+\end{figure}
+
+<<bp_dens, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(2, 4), results = 'hide'>>=
+#Плотность:
+cairo_pdf("plot015.pdf", pointsize = 10, width = 6, height = 3)
+mcmc_dens(lm_array)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot015.pdf}
+  \end{center}
+\end{figure}
+
+<<bp_chain_hist, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(2, 4), results = 'hide'>>=
+#Гистограммы по цепям:
+cairo_pdf("plot016.pdf", pointsize = 10, width = 6, height = 3)
+mcmc_hist_by_chain(lm_array, pars = c("alpha", "beta", "sigma"))
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot016.pdf}
+  \end{center}
+\end{figure}
+
+<<bp_violin, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(2, 4), results = 'hide'>>=
+#"Скрипкограммы" :)
+cairo_pdf("plot017.pdf", pointsize = 10, width = 6, height = 3)
+mcmc_violin(lm_array)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot017.pdf}
+  \end{center}
+\end{figure}
+
+<<bp_trace, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(2, 4), results = 'hide'>>=
+#Графики следов цепей:
+cairo_pdf("plot018.pdf", pointsize = 10, width = 6, height = 3)
+mcmc_trace(lm_array)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot018.pdf}
+  \end{center}
+\end{figure}
+
+<<bp_trace_h, message = FALSE, warning = FALSE, eval = FALSE, echo = -c(2, 4), results = 'hide'>>=
+#Значения цепей по итерации с выделением отельной цепи:
+cairo_pdf("plot019.pdf", pointsize = 10, width = 6, height = 3)
+mcmc_trace_highlight(lm_array, highlight = 2)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot019.pdf}
+  \end{center}
+\end{figure}
+
+\newpage
+\subsection{Прогнозирование в STAN}
+\noindent
+\subsubsection{Блок generated quantities}
+Хорошая модель должна быть хороша не только в объяснении зависимости одной переменной от других, но и в прогнозировании.
+В STAN существует отдельный блок, {\tt{generated quantities}}, в котором с помощью алгоритма можно сгенерировать прогнозируемые значения, согласно оценнённой модели.
+
+\vspace{6pt}
+\noindent
+Рассмотрим пример с моделью AR(3):
+
+\begin{small}
+<<AR(3)pred, message = FALSE, warning = FALSE, eval = FALSE, echo = -1, tidy = TRUE>>=
+options(max.print = 99999)
+AR3_w.pred <- "
+data {
+  int<lower=0> K;
+  int<lower=0> N;
+  real y[N];
+  int<lower=0> T_new;
+}
+parameters {
+  real alpha;
+  real beta[K];
+  real sigma;
+} 
+model {
+  for (n in (K+1):N) {
+    real mu;
+    mu = alpha;
+    for (k in 1:K)
+      mu = mu + beta[k] * y[n-k];
+    y[n] ~ normal(mu, sigma);
+  }}
+generated quantities {
+  vector[T_new] y_tilde;
+  real mu;
+  mu = alpha;
+  for (k in 1:K)
+    mu = mu + beta[k] * y[1764-k];
+  y_tilde[1] = normal_rng(mu, sigma);
+  mu = alpha + beta[2] * y[1765-2] + 
+    beta[3] * y[1765-3] + 
+    beta[1] * y_tilde[1];
+  y_tilde[2] = normal_rng(mu, sigma);
+  mu = alpha + beta[3] * y[1766-3] + 
+    beta[1] * y_tilde[1] + 
+    beta[2] * y_tilde[2];
+  y_tilde[3] = normal_rng(mu, sigma);
+  for (t in 4:T_new) {
+    mu = alpha;
+    for (k in 1:K)
+      mu = mu + beta[k] * y_tilde[t-k];
+    y_tilde[t] = normal_rng(mu, sigma);
+  }}"
+@
+\end{small}
+
+\noindent
+В блоке {\tt{generated quantities}} необходимо написать алгоритм, с помощью которого будут генерироваться прогнозируемые значения.
+Идея в данном случае несложная: необходимо создать вектор с новыми значениями $\tilde{y}$.
+Важно учесть, что $\tilde{y}_1$, $\tilde{y}_2$ и $\tilde{y}_3$ зависят от наблюдаемых значений, поэтому их лучше определить заранее.
+Запустим модель:
+
+<<pred_go, message = FALSE, warning = FALSE, eval = FALSE>>=
+AR3_data <- list(N = length(GOOG),
+                 K = 3,
+                 y = as.vector(GOOG),
+                 T_new = 365)
+
+AR3_fit_pred <- stan(model_code = AR3_w.pred,
+                           data = AR3_data,
+                           iter = 3000,
+                           chains = 4)
+@
+
+\noindent
+В таблице, которую мы получим в результате, помимо коэффициентов будут указаны и прогнозируемые значения (все 365 дней).
+Для компактности я решил не включать её вывод.
+Извлечь прогнозы из таблицы их можно с помощью команды {\tt{extract()}}, содержащейся в пакете {\tt{rstan}}.
+Далее, можно создать вектор из медиан симуляций по каждому дню:
+
+<<ext, message = FALSE, warning = FALSE>>=
+prediction <- rstan::extract(AR3_fit_pred, "y_tilde")
+
+x <- vector()
+for (i in 1:365) {
+  x[i] <- median(prediction$y_tilde[, i])
+}
+@
+
+\noindent
+и создать {\tt{dataframe}} из прогнозируемых и исторических значений.
+
+<<ext2, message = FALSE, warning = FALSE>>=
+dat <- as.data.frame(cbind(
+  as.Date(rownames(as.data.frame(GOOG))), 
+  as.numeric(GOOG)))
+colnames(dat) <- c("Date", "GOOG.Adjusted")
+
+pred <- as.data.frame(cbind(
+  as.Date(seq(from = as.Date("2017-05-14"), 
+              to = as.Date("2018-05-13"), 
+              by = "day")), 
+  x))
+colnames(pred) <- c("Date", "GOOG.Adjusted")
+@
+
+\noindent
+Теперь мы можем отобразить наш прогноз на графике:
+
+<<graphs_pred, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot021.pdf", pointsize = 10, width = 6, height = 3)
+ggplot() +
+  geom_line(data = dat, aes(x = Date, 
+                            y = GOOG.Adjusted)) +
+  geom_line(data = pred, aes(x = Date, 
+                             y = GOOG.Adjusted), 
+            col = "red")
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot021.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Также стоит проверить ряды на сходимость.
+
+<<converge_x, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot023.pdf", pointsize = 10, width = 6, height = 2.8)
+stan_trace(AR3_fit_pred, pars = c("alpha", "beta"))
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot023.pdf}
+  \end{center}
+\end{figure}
+
+<<converge_x2, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot024.pdf", pointsize = 10, width = 6, height = 4)
+stan_trace(AR3_fit_pred, pars = c("y_tilde[1]", 
+                                  "y_tilde[2]", 
+                                  "y_tilde[3]", 
+                                  "y_tilde[4]", 
+                                  "y_tilde[5]",
+                                  "y_tilde[6]"))
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot024.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Для коэффициентов модели и первых 6 прогнозируемых значений всё в порядке. 
+Однако было бы неплохо посмотреть на поведение цепей для последних прогнозов. 
+
+<<converge_x3, message = FALSE, warning = FALSE, echo = -c(1, 3), eval = TRUE, results = 'hide'>>=
+cairo_pdf("plot025.pdf", pointsize = 10, width = 6, height = 4)
+stan_trace(AR3_fit_pred, pars = c("y_tilde[360]", 
+                                  "y_tilde[361]", 
+                                  "y_tilde[362]", 
+                                  "y_tilde[363]", 
+                                  "y_tilde[364]",
+                                  "y_tilde[365]"))
+dev.off()
+@
+
+\newpage
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot025.pdf}
+  \end{center}
+\end{figure}
+
+\subsubsection{Prophet}
+\noindent
+Prophet\footnote{Ссылка: {\url{https://facebookincubator.github.io/prophet/}}} --- проект команды Facebook's Core Data Science.
+Предназначен специально для прогнозов по временным рядам.
+Модели описываются в Stan ({\url{https://goo.gl/QsKvd2}}), пользователю же остаётся воспользоваться несколькими простыми командами.
+Предлагаю разобрать пример с акциями Facebook.
+
+\vspace{6pt}
+\noindent
+{\bf{Примечание:}} таблица данных должна содержать два столбца: ds (дата) и y (наблюдения).
+Важно, чтобы столбец наблюдений имели имя {\it{y}}.
+
+<<getData2, message = FALSE, warning = FALSE, eval = TRUE, results = 'hide'>>=
+getSymbols("FB", 
+           from = "2010-05-13", 
+           to = "2017-05-13", 
+           src = "yahoo")
+FB <- FB[, "FB.Adjusted", drop = F]
+@
+
+\noindent
+Чтобы преобразовать xts-объект в dataframe с отдельными столбцами для даты и наблюдений, воспользуемся следующими командами:
+
+<<df0, message = FALSE, warning = FALSE, eval = TRUE>>=
+df <- data.frame(ds = index(FB), coredata(FB))
+names(df)[2] <- "y"
+@
+
+\noindent
+Теперь с помощью команд {\tt{prophet}} и {\tt{predict}} мы можем построить прогноз:
+
+<<df1, message = FALSE, warning = FALSE, eval = TRUE>>=
+m <- prophet(df)
+future <- make_future_dataframe(m, periods = 365)
+forecast <- predict(m, future)
+@
+
+\noindent
+и отобразить его на графике:
+
+<<df2, message = FALSE, warning = FALSE, eval = TRUE, results = 'hide', echo = -c(1, 3)>>=
+cairo_pdf("plot030.pdf", pointsize = 10, width = 6, height = 4)
+plot(m, forecast)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot030.pdf}
+  \end{center}
+\end{figure}
+
+\newpage
+\subsection{Rstanarm}
+\noindent
+Некоторые модели уже существуют в готовом виде в пакете {\tt{rstanarm}}. 
+
+\subsubsection{Линейные модели}
+\noindent
+В инструкции к пакету можно найти функцию {\tt{stan\_lm()}} которая используется для линейного моделирования. 
+Возьмём пример из этой инструкции.
+В качестве нового параметра появляется {\tt{R2}} - пропорция дисперсии предсказывающих данных в выходящих данных. 
+Иными словами, это своего рода мера априорного распределения, чем она меньше, тем меньше априорная корреляция между выводом и предсказывающими данными, а априорная плотность сильнее сконцентрирована у нуля.
+
+<<stango03, message = FALSE, warning = FALSE, eval = FALSE>>=
+lm3_fit2 <- stan_lm(mpg ~ wt + qsec + am, data = mtcars, prior = R2(0.75), 
+                chains = 4, iter = 1000)
+@
+
+\noindent
+Этот метод намного быстрее, не правда ли? 
+Дело в том, что в {\tt{rstanarm}} все модели уже скомпилированы, и поэтому семплинг происходит быстрее, чем в моделях, которые мы описывали вручную\footnote{Код модели можно узнать введя команду {\tt{lm3\_fit2\$stanfit\@stanmodel}}.}.
+Полученный объект ({\tt{lm3\_fit2}}) не относится к классу {\tt{stanfit}} (но содержит его, об этом немного дальше), а больше похож на обычные регрессии, которые мы строим с помощью {\tt{lm()}}. 
+Чтобы убедиться в этом, выведем отчёт по оценке коэффициентов при переменных, введя команду {\tt{summary()}}:
+
+\begin{small}
+<<summary03, message = FALSE, warning = FALSE, echo = -1, eval = TRUE>>=
+options(width = 70)
+summary(lm3_fit2)
+@
+\end{small}
+
+\noindent
+Чтобы посмотреть на сходимость цепей, нам нужно заглянуть в {\tt{stanfit}} часть объекта {\tt{lm3\_fit2}}, указав {\tt{\$stanfit}}:
+
+<<conv_check, message = FALSE, warning = FALSE, results = 'hide', echo = -c(1, 3), eval = FALSE>>=
+cairo_pdf("plot011.pdf", pointsize = 7, width = 10, height = 7)
+stan_trace(lm3_fit2$stanfit)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot011.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Если мы построим таким образом нашу первоначальную модель, то мы сможем сравнить их:
+
+<<stango04, message = FALSE, warning = FALSE, eval = FALSE>>=
+lm3_fit3 <- stan_lm(mpg ~ wt + hp + am, data = mtcars, prior = R2(0.75), 
+                chains = 4, iter = 1000)
+@
+
+\noindent
+С помощью пакета {\tt{loo}} и одноимённой функции можно преобразовать полученные модели в класс {\tt{loo}} и сравнить их с помощью команды {\tt{compare()}} или просто вывести явно вероятность получения новых данных согласно модели. 
+
+<<loo01, message = FALSE, warning = FALSE, eval = TRUE>>=
+loo1 <- loo(lm3_fit2)
+loo2 <- loo(lm3_fit3)
+loo1
+loo2
+@
+
+\noindent
+Как можно заметить, все оценки Парето k меньше 0.7. 
+Это означает, что сильно влияющих наблюдений нет (напомню, в наборе {\tt{mtcars}} 32 наблюдения), и модели можно сравнить командой {\tt{compare}}:
+
+<<comparex, message = FALSE, warning = FALSE, eval = TRUE>>=
+compare(loo1, loo2)
+@
+ 
+\noindent
+Мы получили два числа, {\tt{elpd\_diff}} (Expected log pointwise predictive density) и стандартную ошибку.
+Если значение {\tt{elpd\_diff / se}} находится в диапазоне [-1.96 ; 1.96] ($z_{0.95}$), то отличие моделей несущественно.
+
+
+
+\subsubsection{Модели бинарного выбора}
+\noindent
+Как и в прошлой секции, процесс идет намного быстрее и занимает не больше минуты.
+Для начала построим логит-модель.
+
+<<stango06, message = FALSE, warning = FALSE, eval = FALSE>>=
+arm_logit <- stan_glm(data = df_titan, Survived ~ Sex + Pclass + Fare + Age,
+                      family = binomial(link = "logit"), x = TRUE,
+                      prior = student_t(df = 7, location = 0, scale = 2.5), 
+                      prior_intercept = normal(0, 10),
+                      chains = 4, iter = 1000)
+@
+
+\noindent
+И посмотрим на результат:
+
+\begin{small}
+<<results, message = FALSE, warning = FALSE>>=
+summary(arm_logit)
+@
+\end{small}
+
+\noindent
+Полученный результат похож на тот, что мы получили в модели, которую описали сами. Теперь посмотрим на сходимость рядов:
+
+<<conv_02, message = FALSE, warning = FALSE, results = 'hide', echo = -c(1, 3)>>=
+cairo_pdf("plot010.pdf",  pointsize = 15, width = 10, height = 8)
+traceplot(arm_logit$stanfit)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot010.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Судя по графикам, всё в порядке. 
+
+\vspace{6pt}
+\noindent
+Пробит-модель строится аналогично, достаточно указать {\tt{family = binomial(link = "probit")}}.
+
+<<stango07, message = FALSE, warning = FALSE, eval = FALSE>>=
+arm_probit <- stan_glm(data = df_titan, Survived ~ Sex + Pclass + Fare + Age,
+                      family = binomial(link = "probit"), x = TRUE,
+                      prior = student_t(df = 7, location = 0, scale = 2.5), 
+                      prior_intercept = normal(0, 10),
+                      chains = 4, iter = 1000)
+@
+
+\noindent
+Результат:
+
+\begin{small}
+<<results02, message = FALSE, warning = FALSE>>=
+summary(arm_probit)
+@
+\end{small}
+
+\noindent
+Предлагаю сравнить модели:
+
+<<loo02, message = FALSE, warning = FALSE, eval = TRUE>>=
+loo1 <- loo(arm_logit)
+loo2 <- loo(arm_probit)
+loo1
+loo2
+@
+
+\noindent
+Влиятельных наблюдений нет, и в целом значения looic близки, поэтому отличиями в моделях можно пренебречь.
+
+\vspace{6pt}
+\noindent
+Сравним полученный байесовский результат логит модели с традиционным частотным подходом:
+
+<<logit_freq, message = FALSE, warning = FALSE>>=
+freq_logit <- glm(data = df_titan, 
+                  Survived ~ Sex + Pclass + Fare + Age,
+                  family = binomial(link = "logit"), x = TRUE)
+summary(freq_logit)
+@
+
+\noindent
+Можно заметить сходство полученных оценок. 
+Также можно посмотреть на предельные эффекты для Байесовский и частотной моделей.
+Для этого нам понадобится функция {\tt{maBina()}} из пакета {\tt{erer}}.
+Чтобы эта функция выдала какой-либо результат, в {\tt{glm()}} нужно указать {\tt{x = TRUE}}.
+
+<<mar_effects, message = FALSE, warning = FALSE, eval = TRUE>>=
+maBina(arm_logit)
+maBina(freq_logit)
+@
+
+\noindent
+Сходство результатов очевидно.
+
+\subsubsection{Прогнозирование в rstanarm}
+\noindent
+Rstanarm позволяет и прогнозировать.
+Сделать это можно стандартным образом, с помощью функции {\tt{predict}}.
+Рассмотрим прогноз шансов на выживание в зависимости от возраста на данных Титаника:
+
+<<rarm_pred, message = FALSE, warning = FALSE, eval = TRUE>>=
+#новые данные
+newdata = data.frame(Age = seq(from = 5, to = 100, length = 100), 
+                     Sex = 1 , Pclass = 2 , Fare = 100)
+
+pr_armlogit <- predict(arm_logit, newdata = newdata, se.fit = TRUE)
+newdata_pr <- cbind(newdata, pr_armlogit)
+
+newdata_pr <- mutate(newdata_pr, prob = plogis(fit), 
+                     left_ci = plogis(fit - 1.96*se.fit),
+                     right_ci = plogis(fit + 1.96*se.fit))
+@
+
+\noindent
+Результат отобразим на графике:
+
+<<pred_rarm, message = FALSE, warning = FALSE, results = 'hide', echo = -c(1, 3), eval = TRUE>>=
+cairo_pdf("plot027.pdf", pointsize = 7, width = 10, height = 7)
+qplot(data = newdata_pr, x = Age, y = prob, geom = "line") +
+  geom_ribbon(aes(ymin = left_ci, ymax = right_ci), alpha = 0.2)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot027.pdf}
+  \end{center}
+\end{figure}
+
+\newpage
+\section{Практическая часть}
+
+\subsection{Индивидуальные предпочтения в телекоме}
+
+\noindent
+Благодаря широким возможностям, Байесовский подход можно (и нужно) применять в исследованиях в самых разнообразных сферах.
+В данной секции речь пойдёт о потребительских предпочтениях индивидов при выборе опций сотовой связи\footnote{Описание здесь: {\url{http://statref.ru/ref_qasrnaqasotr.html}}}.
+Индивидами являются студенты Высшей Школы Экономики.
+Для начала рассмотрим структуру данных.
+
+\begin{small}
+<<small chunk, message = FALSE, warning = FALSE>>=
+tele_dat <- read_spss("dat/conjoint_host_sim_dummy.sav")
+tele_dat <- tele_dat[, order(names(tele_dat))]
+glimpse(tele_dat[, 1:55])
+@
+\end{small}
+
+\noindent
+В наборе данных содержится 296 наблюдений и 359 параметров (можно проверить с {\tt{ncol(tele\_dat)}}).
+Структура следующая: на 7 карточках (T1, \dots, T7) находятся по 5 альтернатив (C1, \dots, C5).
+Указанные числа --- это уровни, выбранные пользователями.
+
+<<unique, message = FALSE, warning = FALSE>>=
+unique(tele_dat$T1_C1_Minutes)
+unique(tele_dat$T1_C1_Gigabytes)
+unique(tele_dat$T1_C1_Personalization)
+unique(tele_dat$T1_C1_Minutes)
+unique(tele_dat$T1_select)
+@
+
+\noindent
+Классическая регрессия на частотном подходе здесь неуместна, в случае если мы хотим включить все переменные (недостаточно степеней свободы).
+Поэтому, конкретно для этой задачи, имеет смысл использовать Байесовский подход.
+
+\vspace{6pt}
+\noindent
+Теперь нам нужно разделить имеющийся набор данных.
+Нам нужны: число наблюдений (отдельно их id), число карточек и альтернатив (кластеров), а также колонки {\tt{TN\_select}} и сами наблюдения. 
+
+<<another chunk, message = FALSE, warning = FALSE>>=
+n_individuals <- nrow(tele_dat)
+n_cards <- 7
+n_alternatives <- 5
+data_ids <- tele_dat$id
+#Получение матриц наблюдений и выборов 
+df_X <- dplyr::select(tele_dat, -ends_with("select")) 
+df_y <- dplyr::select(tele_dat, ends_with("select"))
+@
+
+\noindent
+Далее нужно привести матрицу с наблюдениями в более структурированный вид (отделить карточки и альтернативы).
+
+<<another chunk2, message = FALSE, warning = FALSE>>=
+df_X_melted <- melt(df_X, id.vars = c("id", "version"))
+head(df_X_melted)
+
+df_X_sep <- tidyr::separate(df_X_melted, 
+                            variable, 
+                            into = c("card", 
+                                     "alternative", 
+                                     "variable"), 
+                            sep = "_")
+head(df_X_sep)
+@
+
+\noindent
+Отлично, теперь данные разбиты.
+Следующим шагом будет создание вектора выбора (select) и матрицы наблюдений для каждого индивида.
+Это можно сделать с помощью цикла {\tt{for}}:
+
+\begin{small}
+<<another chunk3, message = FALSE, warning = FALSE>>=
+choice_data <- list()
+# Для каждого индвивида
+for (individual_no in 1:n_individuals) {
+  # Получаем его id
+  person_id <- data_ids[individual_no]
+  # Извлекаем из таблицы T?_select значения для индивида
+  individual_y <- unlist(df_y[individual_no, ])
+  names(individual_y) <- NULL
+  # Сортируем по id индивида и убираем столбцы id и version
+  person_X_melted <- df_X_sep %>% dplyr::filter(id == person_id) %>% 
+    dplyr::select(-id, -version)
+  # создаём матрицу с наблюдениями по индивиду 
+  # для каждой карточки и альтернативы
+  person_X_df <- dcast(person_X_melted, card + alternative  ~ variable, 
+                       value.var = "value")
+  # Удаляем столбцы с метками карточки и альтернативы
+  person_X <- dplyr::select(person_X_df, -card, -alternative) %>% as.matrix()
+  # Создаём список из матриц наблюдений и векторов выборов
+  choice_data[[individual_no]] <- list(y = individual_y, X = person_X)
+}
+@
+\end{small}
+
+\noindent
+В результате мы получим список с матрицами наблюдений (предпочтений) и векторов выбора.
+Для наглядности, посмотрим на элементы этого списка:
+
+\begin{small}
+<<exampl, message = FALSE, warning = FALSE>>=
+head(individual_y)
+
+head(person_X_df)
+@
+\end{small}
+
+\noindent
+В переменной {tt{individual\_y}} хранятся значения {\tt{T1\_select, T2\_select, \dots, T7\_select}} для 296 индивида (он был последним, и его данные сохранились в ячейке).
+А переменная {\tt{person\_X\_df}}, хранит его выбор параметра для каждой альтернативы каждой карточки.
+Переменная {\tt{person\_X}} аналогична последней, но является матрицей, и хранит только числовые значения.
+То есть, допустим, если я хочу знать данные для 123 индивида, я могу просто ввести {\tt{choice\_data[[123]]}}.
+
+\begin{small}
+<<checkindiv, message = FALSE, warning = FALSE>>=
+head(choice_data[[123]]$X)
+choice_data[[123]]$y
+@
+\end{small}
+
+\noindent
+Где получу, что выбор 123-го индивида в карточках Т1--Т3 был 1, для Т4 --- 4, 3 для Т5 и Т6, и 2 в Т7.
+Вторым элементом идёт матрица (Т1\_С1 Гигабайты --- 3, Т2\_С1 Минуты --- 5, и так далее).
+Образно говоря, наш набор данных --- это кирпич, по длине которого идут индивиды, ширине --- кластеры (карточки и альтернативы), а в глубину --- переменные (Гигабайты, минуты и другие).
+
+\vspace{6pt}
+\noindent
+В целом наш набор готов и представлен в удобном виде.
+
+\newpage
+\section{Заключение}
+\noindent
+В данной работе я продемонстрировал преимущества Байесовского подхода и языка Stan и разобрал один практический пример.
+Эта работа еще будет дополняться: в ней недостаточно подробно разобранны модели временных рядов и многое другое.
+
+\vspace{6pt}
+\noindent
+Байесовский подход открывает широкие возможности в сфере исследований и науке о данных и постепенно оттеснит частотный подход, который на сегодняшний день, ввиду исторических событий, занимает доминирующее положение.
+Это вовсе не значит, что частотный подход неверный, наоборот, в нём есть многие полезные для своих задач инструменты: OLS, LASSO, метод максимального правдоподобия и другие.
+Байесвоский подход сможет решить задачи, в которых частотные методы могут испытывать затруднения.
+Его развитие плотно сопряжено с развитием вычислительных технологий, а также с количеством преподавателей, способных доходчиво донести достаточно сложные инструменты Байесовского подхода студентам.
+Выражаю надежду, что читатели данной работы найдут её полезной для своих нужд и заинтересуются изучением этой темы. 
+
+\newpage
+\section{FAQ}
+\noindent
+В данной секции я собрал ответы на вопросы, которые могут возникнуть по ходу чтения работы. 
+
+\subsection{Критерии loo и waic}
+\noindent
+LOO (Leave-one-out) --- информационный критерий, используемый для сравнения Байесовких моделей.
+В качестве альтернативы можно использовать критерий WAIC (Widely Accepted Information Criterion), однако он менее предпочтителен. 
+Эти критерии предназначены для оценки точности предсказывания моделей, и, в отличие от критерия Акаике (AIC), учитывают априорное распределение.
+Важно отметить, что в сравниваемых моделях не должно быть влиятельных наблюдений.
+Их наличие можно определить просто выведя объект, с помощью графика ({\tt{plot([loo object])}}) или команды ({\tt{pareto\_k\_ids}}).
+Подробнее читать здесь: {\url{http://mc-stan.org/rstanarm/reference/loo.stanreg.html}} и здесь: {\url{https://cran.r-project.org/web/packages/loo/loo.pdf}}.
+
+\subsection{На что влияет количество цепей и итераций?}
+\noindent
+От числа цепей зависит то, насколько вероятно обнаружение ошибки в модели. 
+При построении моделей и их анализе, Вы наверняка столкнетесь с ситуацией, когда сходятся не все цепи (если они вообще сходятся). 
+В этом случае нельзя доверять и сошедшемся цепям.
+Оптимального числа цепей нет, однако имеет смысл брать не менее 3--4, а при наличии большего числа ядер в процессоре даже больше.
+
+\vspace{6pt}
+\noindent
+Число итераций влияет на то, сойдётся ли цепь. 
+Если выбрать слишком маленькое количество, то не исключено, что цепь <<не успеет>> сойтись, и при наличии достаточно хорошей модели Вам придётся придумать новую. 
+По умолчанию берутся 2000 итераций, хотя как правило, даже 1000 достаточно для большинства задач. 
+Больше число требует большего времени для вычислений (что очевидно), но и уменьшает стандартную ошибку, увеличивает {\tt{n\_eff}} (т.е. увеличивает шансы сходимости) и в целом обеспечивает более точные оценки.
+Поэтому увеличении итераций рекомендуется в случаях, когда Вас не устраивает значение {\tt{n\_eff}} или необходимо понизить величину ошибки.
+В данной работе количество итераций было увеличено в примере с прогнозированием, как раз, чтобы поднять {\tt{n\_eff}}.
+
+\subsection{Как выбрать априорное распределение?}
+\noindent
+В целом нельзя вывести каких-то строгих правил о выборе априорное распределения.
+При выборе можно субъективно указать, что параметр  $\theta$ лежит в каком-то множестве $\Theta$.
+Также можно руководствоваться существующей, к примеру, исторической информацией и указать априорное распределение, основанное на распределении выборки из этих данных.
+Можно и вовсе ничего не предполагать касательно параметра. 
+Однако даже в этом случае мы неявно предполагаем, что у $\theta$ равные шансы принять любое значение, другими словами, $\theta$ распределено равномерно от $-\infty$ до $+\infty$.
+
+
+
+\subsection{Что такое warmup и sampling?}
+\noindent
+Процесс генерации цепи делится на две фазы --- warmup (или burnin) и sampling.
+Деление условное, по умолчанию в Stan обе фазы занимают по 50\% от всех итераций, и при желании пропорцию можно изменить.
+Оценки рассчитываются из sampling части цепи (в этом можно убедиться, введя {\tt{nrow(as.array([stanfit]))}}).
+На графиках фаза warmup не отображается, но добавив аргумент {\tt{inc\_warmup = TRUE}} можно отобразить и её:
+
+<<inc_warmup, message = FALSE, warning = FALSE, results = 'hide', echo = -c(1, 3)>>=
+cairo_pdf("plot026.pdf", pointsize = 10, width = 6, height = 4)
+stan_trace(logittest_fit, inc_warmup = TRUE)
+dev.off()
+@
+
+\begin{figure}[bh]
+  \begin{center}
+    \includegraphics[width=\textwidth]{plot026.pdf}
+  \end{center}
+\end{figure}
+
+\noindent
+Думаю, из графиков вполне очевидно, почему не стоит убирать фазу разогрева (серая заливка).
+Также очень часто есть резон уменьшить пропорцию (до 20\%--30\%) чтобы воспользоваться большим числом итераций в семплинге.
+
+\subsection{Марковские цепи}
+\noindent
+Марковские цепи --- последовательности случайных событий, в которых вероятность каждого события зависит исключительно от текущего состояния (но не от прошлых). 
+Чтобы лучше понять суть этого понятия, предлагаю обратиться к классической модели о погоде.
+У нас есть два состояния: ясный и дождливый (sunny, rainy) дни, а также вероятности, с которыми эти состояния переходят друг в друга (или в самих себя).
+Таблицу с вероятностями также называют матрицей перехода.
+Схематически нашу модель можно представить следующим образом\footnote{Интерактивную визуализацию можно найти здесь: \url{http://setosa.io/ev/markov-chains/}}:
+
+\begin{figure}[bh]
+\begin{floatrow}
+\vspace{0pt}
+\centering
+  \begin{tikzpicture}[font=\sffamily]
+ 
+    \node[state,
+          text=yellow,
+          fill=black] (s) {Ясно};
+    \node[state,
+          right=2cm of s,
+          text=cyan, 
+          fill=black] (r) {Дождь};
+ 
+    \draw[every loop,
+          auto=right,
+          line width=1mm,
+          >=latex,
+          draw = yellow,
+          fill = yellow]
+        (s) edge[loop above]             node {0.4} (s);
+     \draw[every loop,
+          auto=right,
+          dash pattern = on 3pt off 5pt,
+          line width=1mm,
+          >=latex,
+          draw = yellow,
+          fill = yellow]   
+        (s) edge[bend right, auto=left]  node {0.6} (r)
+        (r) edge[bend right, auto=right] node {0.8} (s);
+      \draw[every loop,
+          auto=right,
+          dash pattern = on 3pt off 5pt,
+          dash phase = 4pt,
+          line width=1mm,
+          >=latex,
+          draw = cyan,
+          fill = cyan]   
+        (s) edge[bend right, auto=left]  node {0.6} (r)
+        (r) edge[bend right, auto=right] node {0.8} (s);
+      \draw[every loop,
+          auto=right,
+          line width=1mm,
+          >=latex,
+          draw = cyan,
+          fill = cyan]
+        (r) edge[loop above]             node {0.2} (r);
+   \end{tikzpicture}
+   \qquad
+   \vspace{0pt}
+\centering
+  \begin{tabular}[BH]{|p{6.5em}|p{6.5em}|p{6.5em}|}
+          \hline
+               & R = Дождь & S = Ясно \\
+          \hline
+              R = Дождь & $P(R|R) = 0.2$ & $Р(S|R) = 0.8$ \\
+          \hline
+              S = Ясно & $P(R|S) = 0.6$ & $Р(S|S) = 0.4$ \\
+          \hline
+      \end{tabular}
+      \vspace{1em}
+\end{floatrow}
+\end{figure}
+
+\noindent
+В ходе работы модели, состояние R будет сменяться на состояние S (или снова R) с некоторой вероятностью. 
+Аналогично для состояния S.
+Замечу, что переход в другое состояние осуществляется в любом случае, поэтому $P(\bullet|S_i) = 1$.
+Однако, это не значит, что из состояния $i$ мы можем перейти во все остальные $n - 1$, то есть могут быть случаи, когда $P(S_j|S_i) = 0$.
+Если мы запишем получаемые состояния по хронологии, то и получим Марковскую цепь.
+С увеличением числа состояний увеличивается и размерность таблицы вероятностей перехода (т.е. при n состояниях получим матрицу вероятностей $n \times n$).
+
+\subsection{МСМС --- алгоритм Монте-Карло по схеме Марковской цепи}
+\noindent
+Как было сказано в секции 4.2, МСМС (Markov Chain Monte-Carlo) --- это способ оценивания параметров модели путём симуляции ожидаемых значений.
+Если говорить конкретнее, то МСМС решает проблему семплирования сложного распредления.
+Допустим, что у нас есть некоторое очень большое (бесконечное) количество листочков с числами, и нам нужно найти значение числа на листке, который сейчас перевернут.
+Разумеется, что у чисел на листках есть некоторое распределение $D$, и мы можем найти точную вероятность получения числа $x$ из этого распределения $p(x)$.
+Возникает проблема: как нам получить максимально точную вероятность угадывания, при условии, что нам известно вероятностное распределение?
+Ведь нам неизвестен алгоритм, по которому генерировались эти числа.
+То есть нам нужно придумать такой случайный алгоритм (функцию) $f(t)$, чтобы вероятность получения числа $x$ была равна $p(x)$.
+Говоря об оценке параметров, то нам необходимо найти математическое ожидание этой функции.
+
+  \begin{center}
+    $E(f(X)) = \displaystyle \int f(X)p(X)dX$
+  \end{center}
+
+\noindent
+Для этого потребуется выборка из априорного распределения 
+
+  \begin{center}
+    $X_1, X_2, \dots X_N \sim p(X)$
+  \end{center}
+  
+\noindent
+Которая, в свою очередь, является марковской цепью.
+Однако, случайные величины в такой выборке не случайны, и чтобы получить независимый набор, берут каждый {\it{m}}-ый элемент.
+Стоит отметить, что разные вариации МСМС работают по-разному (есть схема Метрополиса-Гастингса, схема Гиббса), что влияет на их эффективность, число необходимых итераций, насколько хорошо <<исследуется>> распределение и так далее.
+
+\newpage
+\addcontentsline{toc}{section}{Список литературы}
+\begin{thebibliography}{0}
+  \bibitem{rethinking}
+          Richard McElreath, <<Statistical Rethinking>>, 2015 
+  \bibitem {manual}
+          Stan Development Team, <<Stan Modeling Language User's Guide and Reference Manual>>, Stan Version 2.15.0, 2017
+  \bibitem{articlemain}
+          Andrew Gelman, Daniel Lee, Jiqiang Guo, <<Stan: A probabilistic programming language>>, Journal of Statistical Software, 2015
+  \bibitem {book1}
+          A. Gelman, J. Hill, <<Data Analysis Using Regression and Multilevel/Hierarcical Models>>, Cambridge University press, 2007
+  \bibitem {book2}
+          A. Gelman, J. B. Carlin, H. S. Stern, D. B. Dunson, Aki Vehtari, D. B. Rubin, <<Bayesian Data Analysis>>, CRC Press, 2014
+  \bibitem {essay}
+          Thomas Bayes, <<An Essay towards solving a Problem in the Doctrine of Chances>>, Philosophical Transactions of the Royal Society of London 53 (1763), 370–418
+  \bibitem {book3}
+          Cameron Davidson-Pilon, <<Bayesian Methods for Hackers: Probabilistic Programming and Bayesian Inference>>, Addison-Wesley Professional, 2016
+  \bibitem {lect}
+          Ветров Д.П., Кропотов Д.А. Байесовские методы машинного обучения, учебное пособие по спецкурсу, 2007
+  \bibitem {blog1}
+          Alex Rogozhnikov, <<Hamiltonian Monte Carlo explained>>, Dec 19, 2016, {\url{http://arogozhnikov.github.io/2016/12/19/markov_chain_monte_carlo.html}} (на момент 25.06.2017)
+   \bibitem {article1}
+          Aki Vehtari, Andrew Gelman, Jonah Gabry, <<Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC>>, 	arXiv:1507.04544 [stat.CO], 2016
+   \bibitem {work}
+      <<Програмное обеспечение для байесовского анализа. Продедура получения новых значений параметров в Sawtooth>>.
+      {\url{http://statref.ru/ref_qasrnaqasotr.html}} (на момент 25.06.2017)
+     \bibitem {book?}
+          Байесовский подход и его применение в задачах страхования, гарантийного обслуживания и принятия решений с проведением экспериментов. {\url{http://levvu.narod.ru/Papers/Bayes.pdf}} (на момент 25.06.2017).
+     \bibitem {article2}
+          С. А. Айвазян, <<Байесовский подход в эконометричеком анализе>>, Прикладная Эконометрика, №1(9) 2008
+     \bibitem {blog2}
+          <<R Users Will Now Inevitably Become Bayesians>>
+          {\url{https://thinkinator.com/2016/01/12/r-users-will-now-inevitably-become-bayesians/}} (на момент 25.06.2017)
+     \bibitem{blog3}
+          Kim Larsen, <<Sorry ARIMA, but I’m Going Bayesian>>
+          {\url{http://multithreaded.stitchfix.com/blog/2016/04/21/forget-arima/}}, 2016 (на момент 25.06.2017)
+\end{thebibliography}
+
+
+% \newpage
+% \begin{scriptsize}
+% <<pred_res, message = FALSE, warning = FALSE, echo = -1>>=
+% options(width = 1000)
+% AR3_fit_pred
+% @
+% \end{scriptsize}
+
+\end{document}
